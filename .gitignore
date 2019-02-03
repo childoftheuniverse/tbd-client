@@ -13,3 +13,6 @@
 
 # Compiled protocol buffers
 *.pb.go
+
+# Generated binaries
+bin/tbd-client/tbd-client
