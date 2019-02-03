@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package tbdClient;
+
+/*
+Request for updating an individual bucket.
+*/
+message TokenBucketRequest {
+  /*
+  Buckets are categorized into bucket families, which are their own namespace.
+  */
+  string bucket_family = 1;
+
+  /* Name of the bucket to update tokens for. */
+  string bucket = 2;
+
+  /* Amount of tokens to be deducted from the account. */
+  int64 amount = 3;
+
+  /*
+  If set to true, deduct as many tokens as are available instead of failing.
+  */
+  bool partial_fulfillment = 4;
+}
+
+/*
+TokenBucketResponse represents the response to an individual TokenBucketRequest.
+These will be in the same order as the TokenBucketRequests, but they also
+contain the relevant information to identify them, just in case.
+*/
+message TokenBucketResponse {
+  /* Family of the updated bucket. */
+  string bucket_family = 1;
+
+  /* Name of the updated bucket. */
+  string bucket = 2;
+
+  /* Whether the full amount of tokens could be deducted. */
+  bool success = 3;
+
+  /* Amount of tokens which have actually been deducted from the account. */
+  int64 amount = 4;
+}
+
+/*
+MultiTokenBucketRequest contains a request for token updates from multiple
+buckets.
+*/
+message MultiTokenBucketRequest {
+  /* A number of requests which should be fulfilled in this RPC. */
+  repeated TokenBucketRequest request = 1;
+
+  /*
+  Whether all of the above requests must succeed for the request to succeed.
+  Otherwise, all changes will be rolled back upon failure.
+  */
+  bool require_all = 2;
+}
+
+/*
+MultiTokenBucketResponse is a response to a MultiTokenBucketRequest.
+*/
+message MultiTokenBucketResponse {
+  /*
+  Responses to the TokenBucketRequest protos in the original request, sorted
+  in the same order as the requests.
+  */
+  repeated TokenBucketResponse response = 1;
+
+  /* Indicates whether all of the requests have succeeded. */
+  bool all_succeeded = 2;
+}
+
+service TokenBucketService {
+  rpc MultiTokenRequest (MultiTokenBucketRequest) returns (MultiTokenBucketResponse) {}
+}
