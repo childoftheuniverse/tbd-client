@@ -4,7 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 
-	"github.com/childoftheuniverse/fancylocking"
+  "github.com/childoftheuniverse/fancylocking"
+  "github.com/childoftheuniverse/tbd-client/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -15,7 +16,7 @@ TokenBucketClient is a client for a networked token bucket implementation.
 type TokenBucketClient struct {
 	mtx    fancylocking.MutexWithDeadline
 	conn   *grpc.ClientConn
-	client TokenBucketServiceClient
+	client proto.TokenBucketServiceClient
 }
 
 /*
@@ -43,7 +44,7 @@ func NewTokenBucketClient(
 	return &TokenBucketClient{
 		mtx:    fancylocking.NewMutexWithDeadline(),
 		conn:   conn,
-		client: NewTokenBucketServiceClient(conn),
+		client: proto.NewTokenBucketServiceClient(conn),
 	}, nil
 }
 
@@ -52,8 +53,8 @@ MultiTokenRequest sends a MultiTokenBucketRequest to the server and
 just returns the response.
 */
 func (tbc *TokenBucketClient) MultiTokenRequest(
-	ctx context.Context, in *MultiTokenBucketRequest, opts ...grpc.CallOption) (
-	*MultiTokenBucketResponse, error) {
+	ctx context.Context, in *proto.MultiTokenBucketRequest,
+  opts ...grpc.CallOption) (*proto.MultiTokenBucketResponse, error) {
 	if !tbc.mtx.LockWithContext(ctx) {
 		return nil, ctx.Err()
 	}
@@ -67,19 +68,19 @@ is being returned as a boolean. In any case, the result returned fails open.
 */
 func (tbc *TokenBucketClient) TokenRequest(
 	ctx context.Context, family, bucket string, amount int64) (bool, error) {
-	var mresp *MultiTokenBucketResponse
-	var resp *TokenBucketResponse
+	var mresp *proto.MultiTokenBucketResponse
+	var resp *proto.TokenBucketResponse
 	var opts = []grpc.CallOption{
 		grpc.FailFast(true),
 	}
-	var req = &TokenBucketRequest{
+	var req = &proto.TokenBucketRequest{
 		BucketFamily:       family,
 		Bucket:             bucket,
 		Amount:             amount,
 		PartialFulfillment: false,
 	}
-	var mreq = &MultiTokenBucketRequest{
-		Request:    []*TokenBucketRequest{req},
+	var mreq = &proto.MultiTokenBucketRequest{
+		Request:    []*proto.TokenBucketRequest{req},
 		RequireAll: false,
 	}
   var err error

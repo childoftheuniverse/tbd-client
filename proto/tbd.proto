@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package tbdClient;
+package proto;
 
 /*
 Request for updating an individual bucket.
