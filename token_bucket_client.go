@@ -4,29 +4,36 @@ import (
 	"context"
 	"crypto/tls"
 
-  "github.com/childoftheuniverse/fancylocking"
-  "github.com/childoftheuniverse/tbd-client/proto"
+	"github.com/childoftheuniverse/fancylocking"
+	"github.com/childoftheuniverse/tbd-client/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
+type TokenBucketClient interface {
+	MultiTokenRequest(ctx context.Context, in *proto.MultiTokenBucketRequest,
+		opts ...grpc.CallOption) (*proto.MultiTokenBucketResponse, error)
+	TokenRequest(ctx context.Context, family, bucket string, amount int64) (
+		bool, error)
+}
+
 /*
-TokenBucketClient is a client for a networked token bucket implementation.
+TokenBucketClientImpl is a client for a networked token bucket implementation.
 */
-type TokenBucketClient struct {
+type TokenBucketClientImpl struct {
 	mtx    fancylocking.MutexWithDeadline
 	conn   *grpc.ClientConn
 	client proto.TokenBucketServiceClient
 }
 
 /*
-NewTokenBucketClient creates a new TokenBucketClient for the specified
+NewTokenBucketClient creates a new TokenBucketClientImpl for the specified
 remote address. If a tlsConfig is passed, then TLS is enabled, otherwise
 the client will be run in insecure mode.
 */
 func NewTokenBucketClient(
 	remoteAddr string, tlsConfig *tls.Config, opts ...grpc.DialOption) (
-	*TokenBucketClient, error) {
+	TokenBucketClient, error) {
 	var conn *grpc.ClientConn
 	var err error
 
@@ -41,7 +48,7 @@ func NewTokenBucketClient(
 		return nil, err
 	}
 
-	return &TokenBucketClient{
+	return &TokenBucketClientImpl{
 		mtx:    fancylocking.NewMutexWithDeadline(),
 		conn:   conn,
 		client: proto.NewTokenBucketServiceClient(conn),
@@ -52,9 +59,9 @@ func NewTokenBucketClient(
 MultiTokenRequest sends a MultiTokenBucketRequest to the server and
 just returns the response.
 */
-func (tbc *TokenBucketClient) MultiTokenRequest(
+func (tbc *TokenBucketClientImpl) MultiTokenRequest(
 	ctx context.Context, in *proto.MultiTokenBucketRequest,
-  opts ...grpc.CallOption) (*proto.MultiTokenBucketResponse, error) {
+	opts ...grpc.CallOption) (*proto.MultiTokenBucketResponse, error) {
 	if !tbc.mtx.LockWithContext(ctx) {
 		return nil, ctx.Err()
 	}
@@ -66,7 +73,7 @@ TokenRequest creates a MultiTokenBucketRequest for the parameters passed in
 and sends it to the server; the result of whether the request passed or failed
 is being returned as a boolean. In any case, the result returned fails open.
 */
-func (tbc *TokenBucketClient) TokenRequest(
+func (tbc *TokenBucketClientImpl) TokenRequest(
 	ctx context.Context, family, bucket string, amount int64) (bool, error) {
 	var mresp *proto.MultiTokenBucketResponse
 	var resp *proto.TokenBucketResponse
@@ -83,7 +90,7 @@ func (tbc *TokenBucketClient) TokenRequest(
 		Request:    []*proto.TokenBucketRequest{req},
 		RequireAll: false,
 	}
-  var err error
+	var err error
 
 	if mresp, err = tbc.MultiTokenRequest(ctx, mreq, opts...); err != nil {
 		return true, err
