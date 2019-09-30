@@ -6,6 +6,7 @@ import (
 
 	"github.com/childoftheuniverse/fancylocking"
 	"github.com/childoftheuniverse/tbd-client/proto"
+	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -34,20 +35,33 @@ the client will be run in insecure mode.
 func NewTokenBucketClient(
 	remoteAddr string, tlsConfig *tls.Config, opts ...grpc.DialOption) (
 	TokenBucketClient, error) {
+	var span *trace.Span
 	var conn *grpc.ClientConn
 	var err error
 
+	_, span = trace.StartSpan(
+		context.Background(), "tbd-client.NewTokenBucketClient")
+	defer span.End()
+
 	if tlsConfig == nil {
+		span.AddAttributes(trace.BoolAttribute("tls-credentials", false))
 		opts = append(opts, grpc.WithInsecure())
 	} else {
+		span.AddAttributes(trace.BoolAttribute("tls-credentials", true))
 		opts = append(opts, grpc.WithTransportCredentials(
 			credentials.NewTLS(tlsConfig)))
 	}
 
+	span.Annotate([]trace.Attribute{
+		trace.StringAttribute("remote-addr", remoteAddr),
+	}, "Dialing remote connection")
 	if conn, err = grpc.Dial(remoteAddr, opts...); err != nil {
 		return nil, err
 	}
 
+	span.Annotate([]trace.Attribute{
+		trace.StringAttribute("remote-addr", remoteAddr),
+	}, "Remote connection established")
 	return &TokenBucketClientImpl{
 		mtx:    fancylocking.NewMutexWithDeadline(),
 		conn:   conn,
